@@ -1,0 +1,67 @@
+#!/usr/bin/env python2
+
+import os
+import sys
+from munin import MuninPlugin
+from KamailioRpc import KamailioRpc
+
+
+class KamailioPkgMemPlugin(MuninPlugin):
+    args = "--base 1024 -l 0"
+    vlabel = "bytes"
+    scale = True
+    category = "kamailio"
+    mem_types = ['min_used', 'min_free']
+
+    def __init__(self, instance_name, host, port):
+        self.instance_name = instance_name
+        self.rpc = KamailioRpc(host, port)
+        self.title = self.instance_name.title() + " Private Memory"
+        super(MuninPlugin, self).__init__()
+
+    @property
+    def fields(self):
+        fields = []
+        first = True
+        for type in self.mem_types:
+            opts = dict(
+                label = type,
+                draw = 'AREA' if first else 'STACK',
+                type = "GAUGE",
+                min = "0"
+            )
+            first = False
+            fields.append( (type, opts ))
+        return fields
+
+    def autoconf(self):
+        return True
+
+    def execute(self):
+        return self.get_stats()
+
+    def get_stats(self):
+        output = self.rpc.send_rpc('pkg.stats')
+
+        vals = {'min_free': sys.maxint, 'min_used': 0}
+        for proc in output['result']:
+
+            # end of a process
+            if proc['free'] < vals['min_free']:
+                vals['min_free'] = proc['free']
+                # NOTE: real_used + free = total available (exactly)
+                # (don't know exactly what 'used' means, but it's less then real_used)
+                vals['min_used'] = proc['real_used']
+
+        return vals
+
+
+if __name__ == "__main__":
+    name_parts = os.path.basename(__file__).split('_')
+    kamailio_type = name_parts[-1]
+    host = 'localhost'
+    if 'kamailio_host' in os.environ:
+        host = os.environ['kamailio_host']
+    port = int(os.environ['kamailio_rpc_port'])
+
+    KamailioPkgMemPlugin(kamailio_type, host, port).run()

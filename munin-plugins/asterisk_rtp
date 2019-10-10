@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+#%# family=auto
+#%# capabilities=autoconf
+
+. $MUNIN_LIBDIR/plugins/plugin.sh
+
+if [ "$1" = "autoconf" ]; then
+    if [ -r /etc/asterisk/rtp.conf ]; then
+        echo yes
+    else
+        echo "no (asterisk not found)"
+    fi
+    exit 0
+fi
+
+RTPSTART=`cat /etc/asterisk/rtp.conf | grep ^rtpstart | cut -d= -f2`
+RTPEND=`cat /etc/asterisk/rtp.conf | grep ^rtpend | cut -d= -f2`
+TOTAL=`expr $RTPEND - $RTPSTART`
+
+if [ "$1" = "config" ]; then
+
+    echo 'graph_title Asterisk free RTP ports'
+    echo "graph_args --base 1000 -r --lower-limit 0 --upper-limit $TOTAL"
+    echo 'graph_vlabel free ports'
+    echo 'graph_category asterisk'
+    echo 'graph_info This graph shows the free RTP ports of Asterisk'
+
+    # lower bounds
+    WARN=`expr $TOTAL '*' 25 / 100`
+    CRITICAL=`expr $TOTAL '*' 10 / 100`
+
+    echo 'asterisk.label Asterisk'
+    echo "asterisk.warning $WARN:"
+    echo "asterisk.critical $CRITICAL:"
+
+    exit 0
+fi
+
+# netstat: print all open sockets
+# grep udp: remove netstat header
+# awk: select fourth field (ip:port)
+# awk: select port number, and match port range
+ACTUAL=`sudo /bin/netstat -aupln | grep udp | awk -F '[ ]+' '{ print $4 }' | awk -F ':' "{if (\\$NF >= $RTPSTART && \\$NF <= $RTPEND) { print \\$NF }}" | wc -l`
+FREE=`expr $TOTAL - $ACTUAL`
+
+echo "asterisk.value $FREE"
