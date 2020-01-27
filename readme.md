@@ -3,7 +3,7 @@
 This repository contains several tools built to monitor IPerity Compass PBX and can be used as a starting point for tools to monitor other Kamailio and Asterisk instances.
 
 More information on usage is provided in this blog post:
-[Kamailio memory leaks](https://iperity.com/blogs/fixme)
+[Kamailio memory leaks](https://www.iperity.com/tech-tips/kamailio-memory-leaks/)
 
 # About IPerity and Compass
 
